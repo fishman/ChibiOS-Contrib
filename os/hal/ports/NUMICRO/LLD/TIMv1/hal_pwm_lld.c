@@ -56,8 +56,8 @@ static timer_registers_t regs_table[]=
 /*==========================================================================*/
 
 /** @brief PWM driver identifiers.*/
-PWMDriver PWMD0;
 PWMDriver PWMD1;
+PWMDriver PWMD2;
 
 /*==========================================================================*/
 /* Driver local variables.                                                  */
@@ -72,9 +72,9 @@ static uint8_t timer_index(PWMDriver *pwmp) {
 
   uint8_t index = 0;
 
-  if (pwmp == &PWMD0) return index;
-  else index++;
   if (pwmp == &PWMD1) return index;
+  else index++;
+  if (pwmp == &PWMD2) return index;
 
   /* This is an error! */
   return index;
