@@ -138,16 +138,53 @@ void pwm_lld_start(PWMDriver *pwmp) {
   }
 }
 
+/**
+ * @brief   Deactivates the PWM peripheral.
+ *
+ * @param[in] pwmp      pointer to the @p PWMDriver object
+ *
+ * @notapi
+ */
+void pwm_lld_stop(PWMDriver *pwmp) {
 
-void pwm_lld_enable_period_int(PWM_T *pwm, uint32_t pwmChannel,  uint32_t periodType) {
-    (pwm)->PIER = ((pwm)->PIER & ~(0x01ul << (pwmChannel >> 1))) | (0x01ul << pwmChannel) | (periodType << (pwmChannel >> 1));
 }
 
+/**
+ * @brief   Changes the period the PWM peripheral.
+ * @details This function changes the period of a PWM unit that has already
+ *          been activated using @p pwmStart().
+ * @pre     The PWM unit must have been activated using @p pwmStart().
+ * @post    The PWM unit period is changed to the new value.
+ * @note    The function has effect at the next cycle start.
+ * @note    If a period is specified that is shorter than the pulse width
+ *          programmed in one of the channels then the behavior is not
+ *          guaranteed.
+ *
+ * @param[in] pwmp      pointer to a @p PWMDriver object
+ * @param[in] period    new cycle time in ticks
+ *
+ * @notapi
+ */
+void pwm_lld_change_period(PWMDriver *pwmp, pwmcnt_t period) {
 
-void pwm_lld_disable_period_int(PWM_T *pwm, uint32_t pwmChannel) {
-    (pwm)->PIER &= ~(PWM_PIER_PWMIE0_Msk << pwmChannel);
 }
+/**
+ * @brief   Enables the periodic activation edge notification.
+ * @pre     The PWM unit must have been activated using @p pwmStart().
+ * @note    If the notification is already enabled then the call has no effect.
+ *
+ * @param[in] pwmp      pointer to a @p PWMDriver object
+ *
+ * @notapi
+ */
+void pwm_lld_enable_periodic_notification(PWMDriver *pwmp) {
 
+  uint8_t pwmChannel = timer_index(pwmp);
+  // TODO: needs update
+  *regs_table[i].pier = (*regs_table[i].pier & ~(0x01ul << (pwmChannel >> 1))) | (0x01ul << pwmChannel) | (periodType << (pwmChannel >> 1));
+
+  nvicEnableVector(PWMA_IRQn, 3);
+}
 
 uint32_t pwm_lld_get_period_int(PWM_T *pwm, uint32_t pwmChannel) {
     if ((pwm)->PIIR & (0x01ul << (pwmChannel))) {
@@ -156,6 +193,21 @@ uint32_t pwm_lld_get_period_int(PWM_T *pwm, uint32_t pwmChannel) {
         return 0;
     }
 }
+/**
+ * @brief   Disables the periodic activation edge notification.
+ * @pre     The PWM unit must have been activated using @p pwmStart().
+ * @note    If the notification is already disabled then the call has no effect.
+ *
+ * @param[in] pwmp      pointer to a @p PWMDriver object
+ *
+ * @notapi
+ */
+void pwm_lld_disable_periodic_notification(PWMDriver *pwmp) {
+  pwmp->pwm->INTENCLR = PWM_INTENCLR_PWMPERIODEND_Msk;
+  (pwm)->PIER &= ~(PWM_PIER_PWMIE0_Msk << pwmChannel);
+/* void pwm_lld_disable_period_int(PWM_T *pwm, uint32_t pwmChannel) { */
+}
+
 
 
 void pwm_lld_clear_period_int(PWM_T *pwm, uint32_t pwmChannel) {
