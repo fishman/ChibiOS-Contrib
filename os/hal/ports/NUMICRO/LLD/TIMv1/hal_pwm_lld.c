@@ -1,5 +1,7 @@
 /*
+    ChibiOS - Copyright (C) 2006..2018 Giovanni Di Sirio
     Copyright (C) 2019 /u/KeepItUnder
+    Copyright (C) 2020 Reza Jelveh
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -26,49 +28,114 @@
 
 #if (HAL_USE_PWM == TRUE) || defined(__DOXYGEN__)
 
-/*===========================================================================*/
-/* Driver local definitions.                                                 */
-/*===========================================================================*/
+/*==========================================================================*/
+/* Driver local definitions.                                                */
+/*==========================================================================*/
 
-/*===========================================================================*/
-/* Driver exported variables.                                                */
-/*===========================================================================*/
+#define TIM1_CS_OFFSET CS10
+#define TIM1_WGM_OFFSET1 WGM10
+#define TIM1_WGM_OFFSET2 WGM12
 
-/*===========================================================================*/
-/* Driver local variables and types.                                         */
-/*===========================================================================*/
+typedef struct {
+  volatile uint8_t *pcr;
+  volatile uint8_t *pier;
+  volatile uint8_t *piir;
+  volatile uint8_t *ppr;
+  volatile uint8_t *csr;
+  volatile uint8_t *cmr0;
+  volatile uint8_t *cnr0;
+} timer_registers_t;
 
-/*===========================================================================*/
-/* Driver local functions.                                                   */
-/*===========================================================================*/
+static timer_registers_t regs_table[]=
+{
+  {&PCR, &PIER, &PIIR, &PPR, &CSR, &CMR0, &CNR0},
+};
 
-/*===========================================================================*/
-/* Driver interrupt handlers.                                                */
-/*===========================================================================*/
+/*==========================================================================*/
+/* Driver exported variables.                                               */
+/*==========================================================================*/
 
-/*===========================================================================*/
-/* Driver exported functions.                                                */
-/*===========================================================================*/
+/** @brief PWM driver identifiers.*/
+PWMDriver PWMD0;
+PWMDriver PWMD1;
+
+/*==========================================================================*/
+/* Driver local variables.                                                  */
+/*==========================================================================*/
+
+/*==========================================================================*/
+/* Driver local functions.                                                  */
+/*==========================================================================*/
+
+
+static uint8_t timer_index(PWMDriver *pwmp) {
+
+  uint8_t index = 0;
+
+  if (pwmp == &PWMD0) return index;
+  else index++;
+  if (pwmp == &PWMD1) return index;
+
+  /* This is an error! */
+  return index;
+}
+
+/*==========================================================================*/
+/* Driver interrupt handlers.                                               */
+/*==========================================================================*/
+
+/*
+ * Interrupt for compare1&2 and clock overflow. pwmd1 & pwmd2.
+ */
+OSAL_IRQ_HANDLER(NUC123_PWMA_HANDLER) {
+
+  OSAL_IRQ_PROLOGUE();
+  PWMD1.config->callback(&PWMD1);
+  OSAL_IRQ_EPILOGUE();
+}
+
+
+/*==========================================================================*/
+/* Driver exported functions.                                               */
+/*==========================================================================*/
 
 /**
  * @brief   Low level PWM driver initialization.
  *
  * @notapi
  */
-// void pwm_lld_init(void) {
+void pwm_lld_init(void) {
 
-// }
+  pwmObjectInit(&PWMD0);
+  PWMD0.channels = PWM_CHANNELS;
 
-void pwm_lld_start(PWM_T *pwm, uint32_t mask) {
+  pwmObjectInit(&PWMD1);
+  PWMD1.channels = PWM_CHANNELS;
+
+}
+
+/**
+ * @brief   Configures and activates the PWM peripheral.
+ * @note    We do not use the period value in Timer2 in order to
+ *          be able to use both PWM channels.
+ *
+ * @param[in] pwmp      pointer to the @p PWMDriver object
+ *
+ * @notapi
+ */
+void pwm_lld_start(PWMDriver *pwmp) {
+  if (pwmp->state == PWM_STOP) {
     uint32_t pwmStart = 0;
 
     for(uint32_t i = 0; i < PWM_CHANNELS; i++) {
-        if (mask & (1 << i)) {
-            pwmStart |= (PWM_PCR_CH0EN_Msk << (i * 8));
-        }
+      if (mask & (1 << i)) {
+        pwmStart |= (PWM_PCR_CH0EN_Msk << (i * 8));
+      }
     }
 
-    (pwm)->PCR |= pwmStart;
+    uint8_t i = timer_index(pwmp);
+    *regs_table[i].pcr |= pwmStart;
+  }
 }
 
 
@@ -95,6 +162,20 @@ void pwm_lld_clear_period_int(PWM_T *pwm, uint32_t pwmChannel) {
     (pwm)->PIIR = (0x01ul << pwmChannel);
 }
 
+/**
+ * @brief   Enables a PWM channel.
+ * @pre     The PWM unit must have been activated using @p pwmStart().
+ * @post    The channel is active using the specified configuration.
+ * @note    Depending on the hardware implementation this function has
+ *          effect starting on the next cycle (recommended implementation)
+ *          or immediately (fallback implementation).
+ *
+ * @param[in] pwmp      pointer to a @p PWMDriver object
+ * @param[in] channel   PWM channel identifier (0...PWM_CHANNELS-1)
+ * @param[in] width     PWM pulse width as clock pulses number
+ *
+ * @notapi
+ */
 
 uint32_t pwm_lld_config_output_channel(PWM_T *pwm, uint32_t channel, uint32_t freq, uint32_t duty)
 {
